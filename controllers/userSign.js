@@ -38,6 +38,7 @@ const processSignUp = async (req, res) => {
       message: "registration successful.",
       token: token,
       email: email,
+      userId: newUser.id
     });
   } catch (err) {
     console.log("error during sign-up");
@@ -67,7 +68,7 @@ const processLogin = async (req, res) => {
       // await sendSuccessEmail(email, subject, text);
       res
         .status(200)
-        .json({ message: "login successfully", token: token, email: email });
+        .json({ message: "login successfully", token: token, email: email ,userId:user.id });
     } else {
       console.log("password not match");
       res.status(401).json({ error: "Invalid credentials" });

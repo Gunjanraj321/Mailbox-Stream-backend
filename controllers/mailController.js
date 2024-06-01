@@ -1,37 +1,39 @@
 const Mail = require("../models/mail");
 const User = require("../models/user");
 
-const sendMail = async (req, res) => {
-  const { from, to, subject, content } = req.body;
+const sendMail = async (data) => {
+  // console.log(`line 5 controller`,data);
+  const { from, to, subject, content } = data;
 
   try {
     const sender = await User.findOne({ where: { email: from } });
     const recipient = await User.findOne({ where: { email: to } });
     if (!sender || !recipient) {
-      return res.status(404).json({ message: "User not found" });
-    }
+      console.log('error as sender or receiver mail not found')
+      return;
+      }
     const newMail = await Mail.create({
       senderId: sender.id,
       recipientId: recipient.id,
       subject: subject,
       message: content,
     });
-
-    res.status(201).json({ message: "Mail sent successfully", mail: newMail });
+    // const data = JSON.stringify(newMail)
+    console.log(`from send mail`,newMail.dataValues);
+    return newMail.dataValues;
+    // res.status(201).json({ message: "Mail sent successfully", mail: data });
   } catch (error) {
-    res.status(500).json({ message: "Failed to send mail", error });
+    // res.status(500).json({message:"internal server error"});
+    console.error('error',error);
   }
 };
 
 const fetchMailsForUser = async (req, res) => {
   const userId = req.user.userId;
-
   try {
-    // Find all mails where the recipientId matches the userId
     const receivedMails = await Mail.findAll({
       where: { recipientId: userId },
     });
-
     const mails = await Promise.all(
       receivedMails.map(async (mail) => {
         const sender = await User.findByPk(mail.senderId);
@@ -45,8 +47,8 @@ const fetchMailsForUser = async (req, res) => {
         };
       })
     );
-
     res.status(200).json({ mails });
+
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch mails", error });
   }
