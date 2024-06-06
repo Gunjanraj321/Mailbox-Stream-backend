@@ -1,4 +1,4 @@
-const {sendMail} = require('../controllers/mailController');
+const {sendMail} = require('../controllers/chatController.js');
 
 const socketHandler = (io) => {
     const clients = new Map();

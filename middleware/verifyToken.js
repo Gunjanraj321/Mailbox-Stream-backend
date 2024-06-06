@@ -1,24 +1,17 @@
-require("dotenv").config();
-const User = require("../models/user");
 const jwt = require("jsonwebtoken");
 
-const verify = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization');
-    const key = process.env.jwtSecret;
-    const user = jwt.verify(token, key);
-    const foundUser = await User.findOne({ where: { id: user.userId } });
-  
-    if (!foundUser) {
-      return res.status(401).json({ success: false, message: "User not found" });
-    }
+const verify = function (req, res, next) {
+  const token = req.header("token");
+  // console.log(token)
+  if (!token) return res.status(401).send("Access denied. No token provided.");
 
+  try {
+    const user = jwt.verify(token, "aBcDeFgH123");
     req.user = user;
+    // console.log(req.user)
     next();
-  } catch (error) {
-    console.error(error);
-    return res.status(401).json({ success: false, message: "Token verification failed" });
+  } catch (ex) {
+    res.status(400).send("Invalid token.");
   }
 };
-
-module.exports = { verify };
+module.exports = verify
