@@ -2,54 +2,108 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
-const SECRET_KEY = process.env.jwtSecret;
+const nodemailer = require("nodemailer");
 
 const processSignUp = async (req, res) => {
-  const { userId, deviceId, name, phone, password } = req.body;
-  console.log(req.body);
+  const { name, email, password } = req.body;
+
   try {
-    let user = await User.findOne({ where: { userId } });
-    console.log(user);
-    if (user) {
-      return res.status(400).json({ message: 'User already exists' });
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        error: "missing required fields",
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(409).json({ error: "Email is already registered" });
+    }
 
-    user = await User.create({ userId, deviceId, name, phone, password: hashedPassword, availCoins: 1000 });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    res.status(201).json({ message: 'User registered successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
+    const newUser = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    const token = jwt.sign({ userId: newUser.id }, process.env.jwtSecret);
+    const subject = "Registration Successful";
+    const text = "Thank you for registering. Your registration was successful.";
+    
+    // await sendSuccessEmail(email, subject, text);
+
+    res.status(201).json({
+      message: "registration successful.",
+      token: token,
+      email: email,
+      userId: newUser.id
+    });
+  } catch (err) {
+    console.log("error during sign-up");
+    res.status(500).json({
+      error: "an error occurred while registering the user",
+    });
   }
 };
 
 const processLogin = async (req, res) => {
-  const { userId, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    // Find user
-    const user = await User.findOne({ where: { userId } });
+    const user = await User.findOne({ where: { email } });
+
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ error: "User not found" });
     }
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
-    }
-    // Generate JWT
-    const token = await jwt.sign({ userId: user.userId }, SECRET_KEY, { expiresIn: '1h' });
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    const token = jwt.sign({ userId: user.id }, process.env.jwtSecret);
 
-    res.status(200).json({ token });
+    if (passwordMatch) {
+
+      const subject = "Login Successful";
+      const text = "Thank you for logging in. Your login was successful.";
+      // await sendSuccessEmail(email, subject, text);
+      res
+        .status(200)
+        .json({ message: "login successfully", token: token, email: email ,userId:user.id });
+    } else {
+      console.log("password not match");
+      res.status(401).json({ error: "Invalid credentials" });
+    }
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
+    console.error("Error during login", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while processing the login" });
   }
 };
 
 
+async function sendSuccessEmail(to, subject, text) {
+  const transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+      user: process.env.EMAIL_ID,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+  const mailOptions = {
+    from: process.env.EMAIL_ID,
+    to,
+    subject,
+    text,
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending success email:", error);
+  }
+}
+
 module.exports = {
   processSignUp,
-  processLogin
+  processLogin,
 };
